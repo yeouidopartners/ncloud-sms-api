@@ -8,11 +8,13 @@ export class NCloudSmsApi {
   private _serviceId: string;
   private _secretKey: string;
   private _accessKey: string;
+  private _callingNumber: string;
 
-  constructor(serviceId: string, secretKey: string, accessKey: string) {
-    this._serviceId = serviceId;
-    this._secretKey = secretKey;
-    this._accessKey = accessKey;
+  constructor(credential: SmsApiCredential, callingNumber: string) {
+    this._serviceId = credential.serviceId;
+    this._secretKey = credential.secretKey;
+    this._accessKey = credential.accessKey;
+    this._callingNumber = callingNumber;
   }
   async requestMessage(receiver: string, content: string): Promise<MessageResult>;
   async requestMessage(req: MessageRequest): Promise<MessageResult>;
@@ -34,7 +36,7 @@ export class NCloudSmsApi {
 
       let result = await this._request({
         type: byteLength >= 90 ? 'LMS' : 'SMS',
-        from: '16002871',
+        from: this._callingNumber,
         content,
         messages: [{ to: `${receiver}` }],
       });
@@ -75,6 +77,12 @@ interface MessageResult {
   requestTime: string;
   statusCode: string;
   statusName: string;
+}
+
+export interface SmsApiCredential {
+  serviceId: string;
+  secretKey: string;
+  accessKey: string;
 }
 
 export interface MessageRequest {
