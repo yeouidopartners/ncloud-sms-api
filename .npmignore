@@ -1,6 +1,7 @@
 dist/
 src/
 node_modules/
+example/
 
 tsconfig.json
 pnpm-lock.yaml
