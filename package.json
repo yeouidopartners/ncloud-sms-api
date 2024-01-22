@@ -17,6 +17,10 @@
     "@types/node": "^20.11.5",
     "typescript": "^5.3.3"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yeouidopartners/ncloud-sms-api.git"
+  },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
   }
