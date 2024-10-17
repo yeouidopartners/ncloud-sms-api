@@ -1,27 +1,33 @@
-import axios from 'axios';
-import crypto from 'crypto';
+import axios, { AxiosInstance } from "axios";
+import crypto from "crypto";
 
-const NCLOUD_API_HOST = 'https://sens.apigw.ntruss.com';
+const NCLOUD_API_HOST = "https://sens.apigw.ntruss.com";
 const KOREA_PHONE_NUMBER_REGEX = /^(010|8210)\d{8}$/;
 
 export class NCloudSmsApi {
-  private _serviceId: string;
-  private _secretKey: string;
-  private _accessKey: string;
+  private _credential: SmsApiCredential;
   private _callingNumber: string;
 
-  constructor(credential: SmsApiCredential, callingNumber: string) {
-    this._serviceId = credential.serviceId;
-    this._secretKey = credential.secretKey;
-    this._accessKey = credential.accessKey;
-    this._callingNumber = callingNumber;
-  }
-  async requestMessage(receiver: string, content: string): Promise<MessageResult>;
-  async requestMessage(req: MessageRequest): Promise<MessageResult>;
+  private _client: AxiosInstance;
 
-  async requestMessage(a: any, b?: any): Promise<MessageResult> {
-    if (typeof a === 'string' && typeof b === 'string') {
-      const receiver = a.replace(/[^0-9]/g, '');
+  constructor(credential: SmsApiCredential, callingNumber: string) {
+    this._credential = credential;
+    this._callingNumber = callingNumber;
+    this._client = axios.create({
+      baseURL: NCLOUD_API_HOST,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+      },
+      // prevent throwing exception.
+      validateStatus: () => true,
+    });
+  }
+  async requestMessage(receiver: string, content: string): Promise<SendSmsResponse>;
+  async requestMessage(req: MessageRequest): Promise<SendSmsResponse>;
+
+  async requestMessage(a: string | MessageRequest, b?: string): Promise<SendSmsResponse> {
+    if (typeof a === "string" && typeof b === "string") {
+      const receiver = a.replace(/[^0-9]/g, "");
       const content = b;
 
       if (!KOREA_PHONE_NUMBER_REGEX.test(receiver)) {
@@ -31,52 +37,51 @@ export class NCloudSmsApi {
       const byteLength = Buffer.from(content).length;
 
       if (byteLength > 2000) {
-        throw new Error('Message is too long. max byte length is 2000');
+        throw new Error("Message is too long. max byte length is 2000");
       }
 
       let result = await this._request({
-        type: byteLength >= 90 ? 'LMS' : 'SMS',
+        type: byteLength >= 90 ? "LMS" : "SMS",
         from: this._callingNumber,
         content,
         messages: [{ to: `${receiver}` }],
       });
       return result;
     }
-    if (typeof a === 'object' && typeof b === 'undefined') {
+    if (typeof a === "object" && typeof b === "undefined") {
       let result = await this._request(a);
       return result;
     }
-    throw new Error('Invalid arguments');
+    throw new Error("Invalid arguments");
   }
 
   private async _request(req: MessageRequest) {
     const sendAt = Date.now().toString();
 
-    const path = `/sms/v2/services/${this._serviceId}/messages`;
+    const path = `/sms/v2/services/${this._credential.serviceId}/messages`;
 
-    const hmac = crypto.createHmac('sha256', this._secretKey);
+    const hmac = crypto.createHmac("sha256", this._credential.secretKey);
 
-    hmac.update(`POST ${path}\n${sendAt}\n${this._accessKey}`);
+    hmac.update(`POST ${path}\n${sendAt}\n${this._credential.accessKey}`);
 
-    const signature = hmac.digest('base64');
+    const signature = hmac.digest("base64");
 
-    let res = await axios.post(`${NCLOUD_API_HOST}${path}`, req, {
+    let res = await this._client.post<SendSmsResponse>(path, req, {
       headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-        'x-ncp-iam-access-key': this._accessKey,
-        'x-ncp-apigw-timestamp': sendAt,
-        'x-ncp-apigw-signature-v2': signature,
+        "x-ncp-iam-access-key": this._credential.accessKey,
+        "x-ncp-apigw-timestamp": sendAt,
+        "x-ncp-apigw-signature-v2": signature,
       },
     });
-    return res.data as MessageResult;
+    return res.data;
   }
 }
 
-interface MessageResult {
+interface SendSmsResponse {
   requestId: string;
   requestTime: string;
-  statusCode: string;
-  statusName: string;
+  statusCode: "202" | string;
+  statusName: "success" | "fail";
 }
 
 export interface SmsApiCredential {
@@ -86,8 +91,8 @@ export interface SmsApiCredential {
 }
 
 export interface MessageRequest {
-  type: 'SMS' | 'LMS';
-  contentType?: 'COMM' | 'AD';
+  type: "SMS" | "LMS";
+  contentType?: "COMM" | "AD";
 
   /**
    * @description 국가코드
