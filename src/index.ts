@@ -77,7 +77,7 @@ export class NCloudSmsApi {
   }
 }
 
-interface SendSmsResponse {
+export interface SendSmsResponse {
   requestId: string;
   requestTime: string;
   statusCode: "202" | string;
@@ -117,7 +117,7 @@ export interface MessageRequest {
   messages: Message[];
 }
 
-interface Message {
+export interface Message {
   /**
    * @description 수신자 번호
    * @example 01012345678, 821012345678
